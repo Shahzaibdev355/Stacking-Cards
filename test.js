@@ -9,15 +9,18 @@
 
 
 import { exec } from "child_process";
-import * as readline from "readline";
+// import * as readline from "readline";
 import chalk from "chalk";
 import fs from "fs";
+
+import readline from "readline/promises"; // Use promises-based readline
 
 // Create an interface for user input
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
+
 
 // Helper function to execute shell commands
 const runCommand = (command) => {
@@ -63,30 +66,26 @@ const addChanges = async () => {
 };
 
 const commitChanges = async () => {
-  // Temporarily disable raw mode for commit message input
-  process.stdin.setRawMode(false);
-  
-  rl.question(chalk.yellow("Enter commit message: "), async (message) => {
-    // Re-enable raw mode after getting the message
-    process.stdin.setRawMode(true);
-    
+  try {
+    const message = await rl.question(chalk.yellow("Enter commit message: "));
+
     if (!message.trim()) {
       console.log(chalk.red("Commit message cannot be empty."));
-      return commitChanges(); // Retry if message is empty
+      return await commitChanges(); // Retry if message is empty
     }
-    try {
-      const commit = await runCommand(`git commit -m "${message}"`);
-      console.log(chalk.green(commit || "Changes committed successfully."));
-    } catch (error) {
-      console.log(chalk.red("Failed to commit changes:"), error.message);
-    }
-    
-    // Add a small delay before showing menu to prevent input issues
-    setTimeout(() => {
-      showMenu(); // Return to the menu
-    }, 100);
-  });
+
+    const commit = await runCommand(`git commit -m "${message}"`);
+    console.log(chalk.green(commit || "Changes committed successfully."));
+  } catch (error) {
+    console.log(chalk.red("Failed to commit changes:"), error.message);
+  }
+
+  showMenu(); // Return to the menu
 };
+
+
+
+
 
 const pushToMaster = async () => {
   console.log(chalk.blue("\nPushing changes to the master branch..."));
@@ -145,7 +144,8 @@ const handleMenuSelection = async () => {
       break;
     case 2:
       await commitChanges();
-      break;
+      return; // Avoid redrawing menu until commit is completed
+      // break;
     case 3:
       await pushToMaster();
       await new Promise(resolve => {
@@ -165,8 +165,22 @@ const handleMenuSelection = async () => {
   showMenu(); // Return to the menu after each action
 };
 
+
+
+
+
+
+
+
+
+
+import * as legacyReadline from "readline"; // Use legacy `readline` for `emitKeypressEvents`
+
+legacyReadline.emitKeypressEvents(process.stdin);
+process.stdin.setRawMode(true);
+
 // Keypress handling
-readline.emitKeypressEvents(process.stdin);
+// readline.emitKeypressEvents(process.stdin);
 process.stdin.setRawMode(true);
 
 process.stdin.on("keypress", (str, key) => {
