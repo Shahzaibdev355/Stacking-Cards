@@ -1,11 +1,19 @@
 #!/usr/bin/env node
 
+
+
+// Git-related functions
+
+// node gitAssistant.js
+
+
+
 import { exec } from "child_process";
-import readline from "readline/promises"; // Use promise-based readline
+import * as readline from "readline";
 import chalk from "chalk";
 import fs from "fs";
 
-// Create a single readline interface
+// Create an interface for user input
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -32,7 +40,7 @@ const checkRepoStatus = async () => {
     if (!fs.existsSync(".git")) {
       console.log(chalk.red("No Git repository found in the current directory."));
       console.log(chalk.yellow("Exiting Git Assistant..."));
-      process.exit(1);
+      process.exit(1);  // Exit with error code 1
     }
     console.log(chalk.blue("Git repository found. Checking status..."));
     const status = await runCommand("git status");
@@ -55,21 +63,29 @@ const addChanges = async () => {
 };
 
 const commitChanges = async () => {
-  try {
-    const message = await rl.question(chalk.yellow("Enter commit message: "));
-
+  // Temporarily disable raw mode for commit message input
+  process.stdin.setRawMode(false);
+  
+  rl.question(chalk.yellow("Enter commit message: "), async (message) => {
+    // Re-enable raw mode after getting the message
+    process.stdin.setRawMode(true);
+    
     if (!message.trim()) {
       console.log(chalk.red("Commit message cannot be empty."));
       return commitChanges(); // Retry if message is empty
     }
-
-    const commit = await runCommand(`git commit -m "${message}"`);
-    console.log(chalk.green(commit || "Changes committed successfully."));
-  } catch (error) {
-    console.log(chalk.red("Failed to commit changes:"), error.message);
-  }
-
-  showMenu();
+    try {
+      const commit = await runCommand(`git commit -m "${message}"`);
+      console.log(chalk.green(commit || "Changes committed successfully."));
+    } catch (error) {
+      console.log(chalk.red("Failed to commit changes:"), error.message);
+    }
+    
+    // Add a small delay before showing menu to prevent input issues
+    setTimeout(() => {
+      showMenu(); // Return to the menu
+    }, 100);
+  });
 };
 
 const pushToMaster = async () => {
@@ -110,37 +126,52 @@ const handleMenuSelection = async () => {
   switch (selectedOption) {
     case 0:
       await checkRepoStatus();
+      // Add pause for user to read the status
+      await new Promise(resolve => {
+        console.log(chalk.yellow('\nPress Up key to continue...'));
+        process.stdin.once('data', () => {
+          resolve();
+        });
+      });
       break;
     case 1:
       await addChanges();
+      await new Promise(resolve => {
+        console.log(chalk.yellow('\nPress any key to continue...'));
+        process.stdin.once('data', () => {
+          resolve();
+        });
+      });
       break;
     case 2:
       await commitChanges();
-      return; // Avoid redrawing menu until commit is completed
+      break;
     case 3:
       await pushToMaster();
+      await new Promise(resolve => {
+        console.log(chalk.yellow('\nPress any key to continue...'));
+        process.stdin.once('data', () => {
+          resolve();
+        });
+      });
       break;
     case 4:
       console.log(chalk.green("Goodbye!"));
-      rl.close(); // Close readline interface before exiting
       process.exit(0);
       break;
     default:
       console.log(chalk.red("Unknown option selected."));
   }
-  showMenu();
+  showMenu(); // Return to the menu after each action
 };
 
-// Enable keypress handling
-import * as legacyReadline from "readline"; // Use legacy `readline` for `emitKeypressEvents`
-
-legacyReadline.emitKeypressEvents(process.stdin);
+// Keypress handling
+readline.emitKeypressEvents(process.stdin);
 process.stdin.setRawMode(true);
 
 process.stdin.on("keypress", (str, key) => {
   if (key.name === "c" && key.ctrl) {
     console.log(chalk.green("\nExiting Git Assistant. Goodbye!"));
-    rl.close(); // Ensure readline closes
     process.exit(0);
   }
 
